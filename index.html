@@ -215,24 +215,31 @@ input,textarea{-webkit-user-select:text;user-select:text}
   </div>
 </div>
 
-<script>/* Reconhece o sinal do Homem-Aranha (indicador + mindinho levantados,
-   médio + anelar dobrados) a partir dos 21 pontos da mão do MediaPipe. */
+<script>/* Gestos da mão (21 pontos do MediaPipe).
+   Sinal do Homem-Aranha: indicador e mindinho levantados; médio e anelar NÃO levantados.
+   Punho: os quatro dedos dobrados. */
 function spideyDist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
 function spideyFinger(lm, tip, pip) {
   const w = lm[0];
   const dt = spideyDist(lm[tip], w), dp = spideyDist(lm[pip], w);
-  if (dt > dp * 1.12) return 'up';
-  if (dt < dp * 1.03) return 'down';
+  if (dt > dp * 1.08) return 'up';
+  if (dt < dp * 1.04) return 'down';
   return 'mid';
 }
 function isSpideySign(lm) {
   if (!lm || lm.length < 21) return false;
   return spideyFinger(lm, 8, 6) === 'up' &&
          spideyFinger(lm, 20, 18) === 'up' &&
-         spideyFinger(lm, 12, 10) === 'down' &&
-         spideyFinger(lm, 16, 14) === 'down';
+         spideyFinger(lm, 12, 10) !== 'up' &&
+         spideyFinger(lm, 16, 14) !== 'up';
 }
-if (typeof module !== 'undefined') module.exports = { isSpideySign };
+function isFist(lm) {
+  if (!lm || lm.length < 21) return false;
+  return [[8, 6], [12, 10], [16, 14], [20, 18]].every(([t, p]) => spideyFinger(lm, t, p) === 'down');
+}
+/* tamanho da mão na imagem (pulso até a base do dedo médio): diminui quando a mão se afasta da câmera */
+function handSize(lm) { return spideyDist(lm[0], lm[9]); }
+if (typeof module !== 'undefined') module.exports = { isSpideySign, isFist, handSize };
 </script>
 <script>
 (() => {
@@ -269,7 +276,7 @@ let pulls = 0, web = null, launch = null, done = false;
 
 /* ---------- entrada: dedo ou mão ---------- */
 const touch = {down: false, x: 0, y: 0};
-const cam = {present: false, x: 0, y: 0, raw: false, lastSeen: 0};
+const cam = {present: false, x: 0, y: 0, raw: false, lastSeen: 0, size: 0, fist: false};
 const sg = {on: false, start: 0, lastTrue: -1e9};
 let armed = true, lastIn = {x: 0, y: 0, present: false};
 
@@ -318,11 +325,12 @@ async function startCamera() {
   hands.onResults(r => {
     const lm = r.multiHandLandmarks && r.multiHandLandmarks[0];
     const now = performance.now();
-    if (!lm) { cam.raw = false; return; }
+    if (!lm) { cam.raw = false; cam.fist = false; return; }
     const nx = (1 - lm[9].x) * W, ny = lm[9].y * H;   // espelhado, como um espelho
     if (!cam.present || now - cam.lastSeen > 400) { cam.x = nx; cam.y = ny; }
     else { cam.x += (nx - cam.x) * .55; cam.y += (ny - cam.y) * .55; }
-    cam.present = true; cam.lastSeen = now; cam.raw = isSpideySign(lm);
+    cam.present = true; cam.lastSeen = now; cam.raw = isSpideySign(lm); cam.fist = isFist(lm);
+    const sz = handSize(lm); cam.size = cam.size ? cam.size + (sz - cam.size) * .5 : sz;
   });
   await hands.initialize();
   camOn = true; mode = 'cam';
@@ -411,10 +419,12 @@ function drawGlue(i, now) {
 }
 function reticle(inp, now) {
   if (!inp.present || done) return;
+  const tens = (web && web.phase === 'stuck') ? clamp(web.tension || 0, 0, 1) : 0;
   const on = inp.sign, r = on ? 22 + Math.sin(now / 90) * 2 : 18;
   ctx.save(); ctx.translate(inp.x, inp.y); ctx.lineWidth = 2.5;
   ctx.strokeStyle = on ? '#e5232d' : 'rgba(255,255,255,.7)'; ctx.shadowColor = on ? 'rgba(229,35,45,.9)' : 'rgba(0,0,0,.6)'; ctx.shadowBlur = 10;
   ctx.beginPath(); ctx.arc(0, 0, r, 0, 7); ctx.stroke();
+  if (tens > 0.02) { ctx.lineWidth = 6; ctx.strokeStyle = '#fff'; ctx.shadowColor = 'rgba(229,35,45,.95)'; ctx.shadowBlur = 14; ctx.beginPath(); ctx.arc(0, 0, r + 12, -Math.PI / 2, -Math.PI / 2 + tens * Math.PI * 2); ctx.stroke(); ctx.lineWidth = 2.5; ctx.strokeStyle = on ? '#e5232d' : 'rgba(255,255,255,.7)'; ctx.shadowColor = on ? 'rgba(229,35,45,.9)' : 'rgba(0,0,0,.6)'; ctx.shadowBlur = 10; }
   ctx.beginPath(); ctx.moveTo(-r - 7, 0); ctx.lineTo(-r + 6, 0); ctx.moveTo(r + 7, 0); ctx.lineTo(r - 6, 0);
   ctx.moveTo(0, -r - 7); ctx.lineTo(0, -r + 6); ctx.moveTo(0, r + 7); ctx.lineTo(0, r - 6); ctx.stroke();
   ctx.restore();
@@ -454,7 +464,7 @@ function update(now, inp) {
   // movimento suave do envelope solto
   E.dy += (E.tdy - E.dy) * .12; E.rot += (E.trot - E.rot) * .12;
   const sh = E.shake ? Math.max(0, 1 - (now - E.shakeT) / 420) : 0;
-  E.sx = Math.sin(now / 24) * 4 * sh; if (!sh) E.shake = 0;
+  E.sx = Math.sin(now / 24) * 4 * sh + ((web && web.phase === 'stuck') ? Math.sin(now / 35) * 2.2 * clamp(web.tension || 0, 0, 1) : 0); if (!sh) E.shake = 0;
 
   if (launch) {
     const k = clamp((now - launch.t0) / 1000, 0, 1), e = ease(k);
@@ -473,13 +483,19 @@ function update(now, inp) {
     if (inp.present) { web.hx = inp.x; web.hy = inp.y; }
     if (now - web.t0 > 170) {
       web.phase = 'stuck'; web.t1 = now; const t = target(); web.d0 = Math.hypot(t[0] - web.hx, t[1] - web.hy);
-      buzz(25); setHint('Agora puxe!', mode === 'cam' ? 'Leve a mão para longe do envelope' : 'Arraste o dedo para longe do envelope');
+      web.size0 = (mode === 'cam' && cam.present && !touch.down) ? cam.size : 0; web.fistAt = 0;
+      buzz(25); setHint('Agora puxe!', mode === 'cam' ? 'Leve a mão para trás, como quem puxa uma corda' : 'Arraste o dedo para longe do envelope');
     }
   } else if (web.phase === 'stuck') {
     if (inp.present) { web.hx += (inp.x - web.hx) * .5; web.hy += (inp.y - web.hy) * .5; }
     const t = target(), d = Math.hypot(t[0] - web.hx, t[1] - web.hy);
-    web.tension = clamp((d - web.d0) / pullPx(), 0, 1.2);
-    if (d - web.d0 > pullPx()) doPull(now);
+    // três jeitos de puxar: afastar a mão da câmera (ela fica menor), mover a mão para longe, ou fechar o punho
+    const byMove = (d - web.d0) / (pullPx() * .75);
+    const bySize = (web.size0 && cam.size && now - cam.lastSeen < 400) ? (web.size0 / cam.size - 1) / .22 : 0;
+    const byFist = (mode === 'cam' && cam.fist && now - cam.lastSeen < 400);
+    if (byFist) { web.fistAt = web.fistAt || now; } else { web.fistAt = 0; }
+    web.tension = clamp(Math.max(byMove, bySize, byFist ? (now - web.fistAt) / 250 : 0), 0, 1.2);
+    if (web.tension >= 1) doPull(now);
     else if (now - web.t1 > 7000) { web.phase = 'snap'; web.t0 = now; idleHint(); }
   } else if (web.phase === 'snap') {
     if (now - web.t0 > 260) web = null;
@@ -611,7 +627,7 @@ $('#btnCam').addEventListener('click', async () => {
     msg.textContent = 'Não consegui usar a câmera. Você pode jogar a teia pelo toque.';
   }
 });
-window.__spidey = {get state() { return {started, mode, pulls, phase: web && web.phase, broken: corners.filter(c => c.broken).length, done, bedOn: bed.on, bedBuf: !!bed.buf, muted: bed.muted}; }};
+window.__spidey = {_cam: cam, _setMode: m => { mode = m; }, get tension() { return web ? web.tension : null; }, get state() { return {started, mode, pulls, phase: web && web.phase, broken: corners.filter(c => c.broken).length, done, bedOn: bed.on, bedBuf: !!bed.buf, muted: bed.muted}; }};
 requestAnimationFrame(frame);
 })();
 </script>
