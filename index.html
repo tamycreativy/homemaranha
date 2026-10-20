@@ -112,6 +112,21 @@ input,textarea{-webkit-user-select:text;user-select:text}
 .rs-test{margin:10px 0 0;font-size:12.5px;color:#ffd166;text-align:center;opacity:.9}
 #rsDone{text-align:center}
 #rsDone p{font-size:18px;line-height:1.45;margin:0 0 20px;color:#eceef7}
+
+/* ---------- som e páginas internas ---------- */
+#snd{position:absolute;z-index:30;top:calc(env(safe-area-inset-top,0px) + 12px);right:12px;width:44px;height:44px;border-radius:50%;
+  border:1.5px solid rgba(255,255,255,.35);background:rgba(5,7,15,.6);color:#fff;display:none;align-items:center;justify-content:center;cursor:pointer;
+  -webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px)}
+#snd.show{display:flex}
+#snd svg{width:22px;height:22px}
+#snd .x{display:none}#snd.off .wave{display:none}#snd.off .x{display:block}
+#snd:focus-visible{outline:3px solid #fff;outline-offset:2px}
+#sheet{position:absolute;inset:0;z-index:20;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;padding:18px;
+  background:rgba(5,7,15,.94);touch-action:pan-y;overflow-y:auto}
+#sheet[hidden]{display:none}
+#sheet img{display:block;width:100%;max-width:560px;height:auto;border-radius:14px;
+  box-shadow:0 0 0 2px #2b0508,0 0 34px rgba(229,35,45,.5),0 18px 40px rgba(0,0,0,.7)}
+#sheet .btn{width:100%;max-width:340px}
 </style>
 </head>
 <body>
@@ -128,11 +143,22 @@ input,textarea{-webkit-user-select:text;user-select:text}
       <img class="pg" src="pagina-info.jpg" alt="Convite do Samuel: 9 anos, 21 de novembro, às 17:00" draggable="false">
       <!-- Troque os endereços (href) pelos links reais -->
       <a class="hot" id="hot-rsvp"  href="#confirmar" aria-label="Confirmar presença"></a>
-      <a class="hot" id="hot-local" href="local.html" aria-label="Local da festa"></a>
-      <a class="hot" id="hot-gift"  href="dicas.html" aria-label="Dicas para presentear"></a>
+      <a class="hot" id="hot-local" href="local.html" aria-label="Local da festa" data-sheet="local.jpg" data-alt="Local da festa: Buffet Alegria Mágica."></a>
+      <a class="hot" id="hot-gift"  href="dicas.html" aria-label="Dicas para presentear" data-sheet="dicas.jpg" data-alt="Dicas para presentear o Samuel: brinquedos; blusa tamanho M ou 12 anos; shorts tamanho M ou 11 anos; tênis número 35."></a>
     </div>
   </div>
 
+
+  <div id="sheet" role="dialog" aria-modal="true" aria-label="Informações" hidden>
+    <img id="sheetImg" alt="" draggable="false">
+    <button class="btn main sm" id="sheetBack" type="button">VOLTAR AO CONVITE</button>
+  </div>
+
+  <button id="snd" type="button" aria-label="Som ligado" aria-pressed="false">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M11 5 6 9H3v6h3l5 4z" fill="currentColor"/><path class="wave" d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/><path class="x" d="m16 9 5 6m0-6-5 6"/>
+    </svg>
+  </button>
 
   <div id="rsvp" role="dialog" aria-modal="true" aria-labelledby="rsvpTitle" hidden>
     <div class="rs-card">
@@ -406,10 +432,10 @@ function doPull(now) {
   if (last) startLaunch(now); else idleHint();
 }
 let finaleStarted = false;
-function showInfo() { box.classList.add('ended'); finale.classList.add('live'); }
+function showInfo() { box.classList.add('ended'); finale.classList.add('live'); startBed(); }
 async function startFinale() {
   if (finaleStarted) return; finaleStarted = true;
-  finale.classList.add('on');
+  finale.classList.add('on'); sndBtn.classList.add('show');
   opening.onended = showInfo; opening.onerror = showInfo;
   try { opening.currentTime = 0; opening.muted = false; await opening.play(); }
   catch (_) { try { opening.muted = true; await opening.play(); } catch (__) { showInfo(); } }
@@ -472,6 +498,35 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 
+/* ---------- música de fundo (continua depois do vídeo) ---------- */
+const bed = {buf: null, gain: null, on: false, muted: false};
+async function loadBed() {
+  if (!ac || bed.buf) return;
+  try { const r = await fetch('musica-loop.wav'); bed.buf = await ac.decodeAudioData(await r.arrayBuffer()); } catch (e) { console.warn('musica', e); }
+}
+function startBed() {
+  if (bed.on || !ac || !bed.buf) return; bed.on = true;
+  const g = ac.createGain(), t = ac.currentTime; g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(bed.muted ? 0 : 1, t + .6);
+  const src = ac.createBufferSource(); src.buffer = bed.buf; src.loop = true; src.connect(g); g.connect(ac.destination); src.start(); bed.gain = g;
+}
+const sndBtn = $('#snd');
+sndBtn.addEventListener('click', () => {
+  bed.muted = !bed.muted; opening.muted = bed.muted;
+  if (bed.gain) bed.gain.gain.setTargetAtTime(bed.muted ? 0 : 1, ac.currentTime, .05);
+  sndBtn.classList.toggle('off', bed.muted); sndBtn.setAttribute('aria-pressed', String(bed.muted));
+  sndBtn.setAttribute('aria-label', bed.muted ? 'Som desligado' : 'Som ligado');
+});
+opening.addEventListener('timeupdate', () => { if (opening.currentTime >= 9.2) startBed(); });
+opening.addEventListener('ended', startBed);
+
+/* ---------- páginas internas (dicas e local) sem sair do convite, para a música continuar ---------- */
+const sheet = $('#sheet'), sheetImg = $('#sheetImg');
+document.querySelectorAll('[data-sheet]').forEach(a => a.addEventListener('click', e => {
+  e.preventDefault(); sheetImg.src = a.dataset.sheet; sheetImg.alt = a.dataset.alt || ''; sheet.hidden = false;
+}));
+$('#sheetBack').addEventListener('click', () => { sheet.hidden = true; });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !sheet.hidden) sheet.hidden = true; });
+
 /* ---------- RSVP ---------- */
 const rs = {open: false, vai: 'sim', ad: 1, cr: 0, busy: false};
 const rsvpEl = $('#rsvp'), rsErr = $('#rsErr');
@@ -528,7 +583,7 @@ function unlockVideo() {
   try { opening.muted = false; const pr = opening.play(); if (pr && pr.then) pr.then(() => { opening.pause(); opening.currentTime = 0; }).catch(() => {}); } catch (_) {}
 }
 function begin(useCam) {
-  audioInit(); started = true; intro.classList.add('gone');
+  audioInit(); loadBed(); started = true; intro.classList.add('gone');
   mode = useCam && camOn ? 'cam' : 'touch'; idleHint();
 }
 $('#btnTouch').addEventListener('click', () => { unlockVideo(); mode = 'touch'; begin(false); });
@@ -540,7 +595,7 @@ $('#btnCam').addEventListener('click', async () => {
     msg.textContent = 'Não consegui usar a câmera. Você pode jogar a teia pelo toque.';
   }
 });
-window.__spidey = {get state() { return {started, mode, pulls, phase: web && web.phase, broken: corners.filter(c => c.broken).length, done}; }};
+window.__spidey = {get state() { return {started, mode, pulls, phase: web && web.phase, broken: corners.filter(c => c.broken).length, done, bedOn: bed.on, bedBuf: !!bed.buf, muted: bed.muted}; }};
 requestAnimationFrame(frame);
 })();
 </script>
