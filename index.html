@@ -60,6 +60,11 @@ html,body{margin:0;height:100%;background:var(--ink);overflow:hidden;font-family
 .btn.main::before{left:14px}
 .btn.main::after{right:14px;transform:scaleX(-1)}
 .btn.main:disabled{opacity:.7}
+a.btn{text-decoration:none;text-align:center}
+.btn.sm{font-size:21px;letter-spacing:.05em;padding:14px 48px;border-radius:999px}
+.btn.sm::before,.btn.sm::after{top:7px;bottom:7px;width:26px}
+.btn.sm::before{left:12px}.btn.sm::after{right:12px}
+.actions{display:flex;flex-direction:column;gap:14px;margin-top:6px}
 .btn.main:active{transform:translateY(1px)}
 .btn.alt{background:transparent;color:#fff;text-shadow:0 2px 6px #000,0 0 12px #000;font-family:var(--body);font-weight:700;font-size:17px;letter-spacing:.02em;margin-top:6px;padding:12px}
 .btn:focus-visible{outline:3px solid #fff;outline-offset:3px}
@@ -70,12 +75,12 @@ html,body{margin:0;height:100%;background:var(--ink);overflow:hidden;font-family
   background:radial-gradient(120% 90% at 50% 20%,rgba(36,71,201,.35),rgba(5,7,15,.96) 70%);
   opacity:0;pointer-events:none;transition:opacity .7s}
 #info.on{opacity:1;pointer-events:auto}
-.card{width:100%;max-width:360px;text-align:center;color:var(--paper);padding:34px 24px;
+.card{width:100%;max-width:360px;text-align:center;color:var(--paper);padding:30px 22px;
   border:1px solid rgba(255,255,255,.18);background:rgba(5,7,15,.55);border-radius:6px}
 .card .k{font-family:var(--display);letter-spacing:.22em;font-size:15px;color:var(--red)}
-.card h2{font-family:var(--display);font-weight:400;font-size:clamp(44px,14vw,64px);line-height:.95;margin:8px 0 6px}
+.card h2{font-family:var(--display);font-weight:400;font-size:clamp(40px,12vw,56px);line-height:.95;margin:6px 0 4px}
 .card .age{font-family:var(--display);font-size:28px;letter-spacing:.1em;color:var(--muted)}
-.card hr{border:0;border-top:1px solid rgba(255,255,255,.16);margin:20px 0}
+.card hr{border:0;border-top:1px solid rgba(255,255,255,.16);margin:18px 0}
 .card p{margin:4px 0;font-size:17px}
 .card .ph{opacity:.6;font-size:13px;margin-top:18px}
 </style>
@@ -96,7 +101,13 @@ html,body{margin:0;height:100%;background:var(--ink);overflow:hidden;font-family
       <hr>
       <p>[Data] · [Horário]</p>
       <p>[Local do evento]</p>
-      <div class="ph">Página de informações provisória, só para fechar o teste da capa.</div>
+      <hr>
+      <!-- Troque os endereços (href) pelos links reais do convite -->
+      <div class="actions">
+        <a class="btn main sm" id="goRsvp"  href="https://wa.me/55DDDNUMERO?text=Confirmo%20presen%C3%A7a!" target="_blank" rel="noopener">CONFIRMAR PRESENÇA</a>
+        <a class="btn main sm" id="goLocal" href="https://www.google.com/maps/search/?api=1&query=ENDERECO+DA+FESTA" target="_blank" rel="noopener">LOCAL DA FESTA</a>
+        <a class="btn main sm" id="goGift"  href="#dicas">DICAS PARA PRESENTEAR</a>
+      </div>
     </div>
   </div>
 
