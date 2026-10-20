@@ -113,6 +113,12 @@ input,textarea{-webkit-user-select:text;user-select:text}
 #rsDone{text-align:center}
 #rsDone p{font-size:18px;line-height:1.45;margin:0 0 20px;color:#eceef7}
 
+#skip{position:absolute;z-index:6;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 22px);
+  font-family:var(--display);font-size:20px;letter-spacing:.14em;color:#fff;padding:10px 26px 9px;border-radius:999px;cursor:pointer;
+  border:1.5px solid rgba(255,255,255,.4);background:rgba(5,7,15,.6);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);
+  text-shadow:0 1px 4px #000}
+#skip[hidden]{display:none}
+#skip:focus-visible{outline:3px solid #fff;outline-offset:3px}
 /* ---------- som e páginas internas ---------- */
 #snd{position:absolute;z-index:30;top:calc(env(safe-area-inset-top,0px) + 12px);right:12px;width:44px;height:44px;border-radius:50%;
   border:1.5px solid rgba(255,255,255,.35);background:rgba(5,7,15,.6);color:#fff;display:none;align-items:center;justify-content:center;cursor:pointer;
@@ -135,6 +141,7 @@ input,textarea{-webkit-user-select:text;user-select:text}
   <canvas id="fx"></canvas>
   <video id="video" playsinline muted autoplay></video>
   <div id="hint" class="off"></div>
+  <button id="skip" type="button" hidden aria-label="Pular a teia e abrir o envelope">PULAR &rsaquo;</button>
 
   <!-- Final: vídeo de abertura e, no fim dele, a página de informações com os 3 botões clicáveis -->
   <div id="finale">
@@ -279,6 +286,7 @@ function currentInput(now) {
 
 stage.addEventListener('pointerdown', e => {
   if (!started || done || mode !== 'touch') return;
+  if (e.target.closest && e.target.closest('button, a')) return;
   stage.setPointerCapture(e.pointerId);
   const r = stage.getBoundingClientRect();
   touch.down = true; touch.x = e.clientX - r.left; touch.y = e.clientY - r.top;
@@ -440,7 +448,7 @@ async function startFinale() {
   try { opening.currentTime = 0; opening.muted = false; await opening.play(); }
   catch (_) { try { opening.muted = true; await opening.play(); } catch (__) { showInfo(); } }
 }
-function startLaunch(now) { launch = {t0: now}; setHint(''); buzz([40, 40, 120]); }
+function startLaunch(now) { launch = {t0: now}; setHint(''); skipBtn.hidden = true; buzz([40, 40, 120]); }
 
 function update(now, inp) {
   // movimento suave do envelope solto
@@ -510,6 +518,14 @@ function startBed() {
   const src = ac.createBufferSource(); src.buffer = bed.buf; src.loop = true; src.connect(g); g.connect(ac.destination); src.start(); bed.gain = g;
 }
 const sndBtn = $('#snd');
+const skipBtn = $('#skip');
+skipBtn.addEventListener('click', e => {
+  e.stopPropagation(); if (launch || done) return;
+  skipBtn.hidden = true; web = null; touch.down = false; pulls = PULLS; setHint('');
+  corners.forEach(c => { if (!c.broken) { c.broken = true; c.t0 = performance.now(); } });
+  launch = {t0: performance.now() - 450};          // pula direto para o envelope vindo para a frente
+  startFinale();
+});
 sndBtn.addEventListener('click', () => {
   bed.muted = !bed.muted; opening.muted = bed.muted;
   if (bed.gain) bed.gain.gain.setTargetAtTime(bed.muted ? 0 : 1, ac.currentTime, .05);
@@ -583,7 +599,7 @@ function unlockVideo() {
   try { opening.muted = false; const pr = opening.play(); if (pr && pr.then) pr.then(() => { opening.pause(); opening.currentTime = 0; }).catch(() => {}); } catch (_) {}
 }
 function begin(useCam) {
-  audioInit(); loadBed(); started = true; intro.classList.add('gone');
+  audioInit(); loadBed(); started = true; skipBtn.hidden = false; intro.classList.add('gone');
   mode = useCam && camOn ? 'cam' : 'touch'; idleHint();
 }
 $('#btnTouch').addEventListener('click', () => { unlockVideo(); mode = 'touch'; begin(false); });
