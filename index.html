@@ -159,7 +159,6 @@ input,textarea{-webkit-user-select:text;user-select:text}
           <textarea id="rsMsg" maxlength="300" placeholder="Deixe uma mensagem para o herói"></textarea>
           <p id="rsErr" role="alert"></p>
           <button class="btn main sm" id="rsSend" type="submit">ENVIAR CONFIRMAÇÃO</button>
-          <p class="rs-test" id="rsTest" hidden>Modo de teste: as respostas ainda não estão sendo salvas.</p>
         </form>
       </div>
       <div id="rsDone" hidden>
@@ -483,7 +482,7 @@ function rsRender() {
 }
 function openRsvp() {
   rs.open = true; rsvpEl.hidden = false; $('#rsForm').hidden = false; $('#rsDone').hidden = true;
-  $('#rsTest').hidden = !!RSVP.url; rsErr.textContent = ''; rsRender();
+  rsErr.textContent = ''; rsRender();
   setTimeout(() => { try { $('#rsName').focus({preventScroll: true}); } catch (_) {} }, 60);
 }
 function closeRsvp() { rs.open = false; rsvpEl.hidden = true; }
