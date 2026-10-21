@@ -319,6 +319,13 @@ function loadScript(src) {
     s.onload = res; s.onerror = () => rej(new Error('script')); document.head.appendChild(s);
   });
 }
+let camStop = false, camStream = null, camHands = null;
+function stopCamera() {
+  camStop = true; camOn = false;
+  try { if (camStream) camStream.getTracks().forEach(t => t.stop()); } catch (_) {}
+  try { if (camHands) camHands.close(); } catch (_) {}
+  camStream = camHands = null; try { video.srcObject = null; } catch (_) {}
+}
 async function startCamera() {
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw new Error('sem câmera no navegador');
   msg.textContent = 'Pedindo acesso à câmera…';
@@ -342,7 +349,9 @@ async function startCamera() {
   await hands.initialize();
   camOn = true; mode = 'cam';
   let busy = false;
+  camStream = stream; camHands = hands;
   const pump = async () => {
+    if (camStop) return;
     if (!busy && video.readyState >= 2) { busy = true; try { await hands.send({image: video}); } catch (_) {} busy = false; }
     requestAnimationFrame(pump);
   };
@@ -460,6 +469,7 @@ let finaleStarted = false;
 function showInfo() { box.classList.add('ended'); finale.classList.add('live'); startBed(); }
 async function startFinale() {
   if (finaleStarted) return; finaleStarted = true;
+  stopCamera();   // a câmera e o reconhecimento pesam no celular e fariam a música/vídeo travar
   finale.classList.add('on'); sndBtn.classList.add('show');
   opening.onended = showInfo; opening.onerror = showInfo;
   try { opening.currentTime = 0; opening.muted = false; await opening.play(); }
@@ -524,6 +534,7 @@ function render(now, inp) {
 }
 
 function frame(now) {
+  if (done) return;   // depois que o envelope sai, não precisa mais redesenhar
   const inp = currentInput(now);
   update(now, inp); render(now, inp);
   requestAnimationFrame(frame);
