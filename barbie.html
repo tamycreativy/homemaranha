@@ -45,13 +45,10 @@ let p=0,open=false,drag=null,raf=0;
 const H=()=>stage.clientHeight;
 let q=0;
 function render(){
-  card.style.transform=`translateY(${-p*(300/1672*100)*(1-q)}%)`;
-  heart.style.top=(76.4-p*42)+'%';
-  heart.style.opacity=Math.max(0,1-q*2);
-  cover.style.transform=`translateY(${q*q*12}%)`;
-  cover.style.opacity=Math.max(0,1-q*1.7);
-  cover.style.visibility=q>=1?'hidden':'';
+  cover.style.transform=`translateY(${-p*101}%)`;
+  heart.style.top=(76.4-p*101)+'%';
   hint.style.opacity=p>.03?0:1;
+  cover.style.visibility=p>=1?'hidden':'';
 }
 const setP=v=>{p=Math.max(0,Math.min(1,v));render()};
 function spark(n){const r=heart.getBoundingClientRect(),s=stage.getBoundingClientRect();
@@ -64,19 +61,19 @@ const out=t=>1-Math.pow(1-t,3), io=t=>t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2;
 function tween(get,set,to,dur,ease,done){cancelAnimationFrame(raf);const a=get(),t0=performance.now();
  const f=now=>{const t=Math.min(1,(now-t0)/dur);set(a+(to-a)*ease(t));if(t<1)raf=requestAnimationFrame(f);else done&&done()};raf=requestAnimationFrame(f)}
 const toP=(v,d,e,cb)=>tween(()=>p,setP,v,d,e,cb);
-function openIt(){open=true;spark(14);toP(1,Math.max(250,(1-p)*500),out,()=>{heart.style.pointerEvents='none';tween(()=>q,v=>{q=v;render()},1,1000,io,()=>reset.classList.add('on'))})}
+function openIt(){open=true;spark(10);heart.style.pointerEvents='none';toP(1,Math.max(300,(1-p)*750),out,()=>reset.classList.add('on'))}
 heart.addEventListener('pointerdown',e=>{if(open)return;cancelAnimationFrame(raf);heart.setPointerCapture(e.pointerId);
  drag={y:e.clientY,p0:p,last:e.clientY,t:performance.now(),v:0,sp:0};heart.classList.add('drag')});
 heart.addEventListener('pointermove',e=>{if(!drag)return;
- setP(drag.p0+(drag.y-e.clientY)/(H()*.42));
+ setP(drag.p0+(drag.y-e.clientY)/(H()*1.01));
  const now=performance.now(),dt=now-drag.t;if(dt>0){drag.v=(drag.last-e.clientY)/dt;drag.last=e.clientY;drag.t=now}
  heart.style.setProperty('--rot',Math.max(-8,Math.min(8,(e.movementX||0)*1.2))+'deg');
  if(now-drag.sp>70){drag.sp=now;spark(1)}});
 const end=()=>{if(!drag)return;const v=drag.v;drag=null;heart.classList.remove('drag');
- if(p>.5||(v>.5&&p>.15))openIt();else toP(0,420,out)};
+ if(p>.3||(v>.5&&p>.08))openIt();else toP(0,420,out)};
 heart.addEventListener('pointerup',end);heart.addEventListener('pointercancel',end);
 heart.addEventListener('click',()=>{if(p===0&&!open)toP(.12,180,out,()=>toP(0,380,out))});
-reset.addEventListener('click',()=>{reset.classList.remove('on');tween(()=>q,v=>{q=v;render()},0,800,io,()=>{heart.style.pointerEvents='';toP(0,500,io,()=>{open=false})})});
+reset.addEventListener('click',()=>{reset.classList.remove('on');toP(0,800,io,()=>{open=false;heart.style.pointerEvents=''})});
 window.__t={setP,get p(){return p}};
 render();
 })();
