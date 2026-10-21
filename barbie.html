@@ -42,7 +42,7 @@ let p=0,open=false,drag=null,raf=0;
 const H=()=>stage.clientHeight;
 function render(){
   cover.style.transform=`translateY(${-p*101}%)`;
-  heart.style.top=(76.4-p*54.4)+'%';
+  heart.style.top=(76.4-p*42)+'%';
   hint.style.opacity=p>.03?0:1;cover.style.visibility=p>=1?'hidden':'';
 }
 const setP=v=>{p=Math.max(0,Math.min(1,v));render()};
@@ -60,7 +60,7 @@ function openIt(){open=true;spark(16);heart.style.transition='opacity .6s .45s';
 heart.addEventListener('pointerdown',e=>{if(open)return;cancelAnimationFrame(raf);heart.setPointerCapture(e.pointerId);
  drag={y:e.clientY,p0:p,last:e.clientY,t:performance.now(),v:0,sp:0};heart.classList.add('drag')});
 heart.addEventListener('pointermove',e=>{if(!drag)return;
- setP(drag.p0+(drag.y-e.clientY)/(H()*.544));
+ setP(drag.p0+(drag.y-e.clientY)/(H()*.42));
  const now=performance.now(),dt=now-drag.t;if(dt>0){drag.v=(drag.last-e.clientY)/dt;drag.last=e.clientY;drag.t=now}
  heart.style.setProperty('--rot',Math.max(-8,Math.min(8,(e.movementX||0)*1.2))+'deg');
  if(now-drag.sp>70){drag.sp=now;spark(1)}});
