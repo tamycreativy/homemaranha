@@ -285,7 +285,7 @@ let pulls = 0, web = null, launch = null, done = false;
 const touch = {down: false, x: 0, y: 0};
 const cam = {present: false, x: 0, y: 0, raw: false, lastSeen: 0, size: 0, fist: false};
 const sg = {on: false, start: 0, lastTrue: -1e9};
-let armed = true, lastIn = {x: 0, y: 0, present: false};
+let armed = true, rearmAt = 0, lastIn = {x: 0, y: 0, present: false};
 
 function currentInput(now) {
   let raw, x, y, present;
@@ -343,8 +343,9 @@ async function startCamera() {
     const nx = (1 - lm[9].x) * W, ny = lm[9].y * H;   // espelhado, como um espelho
     if (!cam.present || now - cam.lastSeen > 400) { cam.x = nx; cam.y = ny; }
     else { cam.x += (nx - cam.x) * .55; cam.y += (ny - cam.y) * .55; }
-    cam.present = true; cam.lastSeen = now; cam.raw = isSpideySign(lm); cam.fist = isFist(lm);
+    cam.present = true; cam.lastSeen = now; cam.raw = true; cam.fist = isFist(lm);
     const sz = handSize(lm); cam.size = cam.size ? cam.size + (sz - cam.size) * .5 : sz;
+    if (!cam.ref || cam.size > cam.ref || now - cam.refT > 1500) { cam.ref = cam.size; cam.refT = now; }
   });
   await hands.initialize();
   camOn = true; mode = 'cam';
@@ -392,8 +393,8 @@ window.addEventListener('resize', resize); resize();
 function setHint(t, sub) { hint.innerHTML = t + (sub ? '<small>' + sub + '</small>' : ''); hint.classList.toggle('off', !t); }
 function idleHint() {
   const left = PULLS - pulls;
-  const cta = mode === 'cam' ? 'Faça o sinal do Homem-Aranha' : 'Arraste para lançar a teia';
-  const sub = pulls === 0 ? 'Mire no envelope' : (left === 1 ? 'Falta só uma!' : 'Mais ' + left + ' teias');
+  const cta = mode === 'cam' ? 'Mostre a mão para a câmera' : 'Arraste para lançar a teia';
+  const sub = pulls === 0 ? (mode === 'cam' ? 'A teia sai sozinha' : 'Mire no envelope') : (left === 1 ? 'Falta só uma!' : 'Mais ' + left + ' teias');
   setHint(cta, sub);
 }
 
@@ -492,7 +493,7 @@ function update(now, inp) {
   }
   if (!web) {
     if (!started) return;
-    if (inp.sign && armed && inp.heldMs >= (inp.viaTouch ? 0 : 160)) shoot(inp, now);
+    if (inp.sign && armed && inp.heldMs >= (inp.viaTouch ? 0 : 160) && now >= rearmAt) shoot(inp, now);
     else if (!inp.sign) armed = true;
     return;
   }
@@ -500,22 +501,25 @@ function update(now, inp) {
     if (inp.present) { web.hx = inp.x; web.hy = inp.y; }
     if (now - web.t0 > 170) {
       web.phase = 'stuck'; web.t1 = now; const t = target(); web.d0 = Math.hypot(t[0] - web.hx, t[1] - web.hy);
-      web.size0 = (mode === 'cam' && cam.present && !touch.down) ? cam.size : 0; web.fistAt = 0;
-      buzz(25); setHint('Agora puxe!', mode === 'cam' ? 'Leve a mão para trás, como quem puxa uma corda' : 'Arraste o dedo para longe do envelope');
+      web.size0 = (mode === 'cam' && cam.present && !touch.down) ? Math.max(cam.size, cam.ref || 0) : 0; web.fistAt = 0; web.peak = 0;
+      buzz(25); setHint('Agora puxe!', mode === 'cam' ? 'Leve a mão para trás e solte, como quem puxa uma corda' : 'Arraste o dedo para longe do envelope');
     }
   } else if (web.phase === 'stuck') {
     if (inp.present) { web.hx += (inp.x - web.hx) * .5; web.hy += (inp.y - web.hy) * .5; }
     const t = target(), d = Math.hypot(t[0] - web.hx, t[1] - web.hy);
     // três jeitos de puxar: afastar a mão da câmera (ela fica menor), mover a mão para longe, ou fechar o punho
-    const byMove = (d - web.d0) / (pullPx() * .75);
-    const bySize = (web.size0 && cam.size && now - cam.lastSeen < 400) ? (web.size0 / cam.size - 1) / .22 : 0;
+    const byMove = (d - web.d0) / (pullPx() * .5);
+    const bySize = (web.size0 && cam.size && now - cam.lastSeen < 400) ? (web.size0 / cam.size - 1) / .14 : 0;
     const byFist = (mode === 'cam' && cam.fist && now - cam.lastSeen < 400);
     if (byFist) { web.fistAt = web.fistAt || now; } else { web.fistAt = 0; }
-    web.tension = clamp(Math.max(byMove, bySize, byFist ? (now - web.fistAt) / 250 : 0), 0, 1.2);
-    if (web.tension >= 1) doPull(now);
+    web.tension = clamp(Math.max(byMove, bySize, byFist ? (now - web.fistAt) / 180 : 0), 0, 1.2);
+    web.peak = Math.max(web.peak || 0, web.tension);
+    // puxou para trás e soltou: conta a puxada mesmo sem chegar ao máximo
+    const released = mode === 'cam' && web.peak >= .55 && web.tension < web.peak - .3;
+    if (web.tension >= 1 || released) doPull(now);
     else if (now - web.t1 > 7000) { web.phase = 'snap'; web.t0 = now; idleHint(); }
   } else if (web.phase === 'snap') {
-    if (now - web.t0 > 260) web = null;
+    if (now - web.t0 > 260) { web = null; if (mode === 'cam') { armed = true; rearmAt = now + 600; } }
   }
 }
 
@@ -530,7 +534,7 @@ function render(now, inp) {
     else if (web.phase === 'stuck') drawWeb(h, t, web.tension || 0, 1);
     else { const k = clamp((now - web.t0) / 260, 0, 1); drawWeb([h[0] + (t[0] - h[0]) * ease(k), h[1] + (t[1] - h[1]) * ease(k)], t, 0, 1 - k); }
   }
-  if (!launch && started) reticle(inp, now);
+  if (!launch && started && mode !== 'cam') reticle(inp, now);
 }
 
 function frame(now) {
