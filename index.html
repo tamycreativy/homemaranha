@@ -73,8 +73,8 @@ a.btn{text-decoration:none;text-align:center}
 #finale.on{opacity:1}
 #finale.live{pointer-events:auto}
 .box{position:relative;width:100%;aspect-ratio:941/1672;
-  -webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 6%);
-  mask-image:linear-gradient(to bottom,transparent 0,#000 6%)}
+}
+.box::after{content:"";position:absolute;left:0;right:0;top:0;height:6%;pointer-events:none;background:linear-gradient(to bottom,var(--ink),rgba(5,7,15,0))}
 .box video,.box img.pg{position:absolute;inset:0;width:100%;height:100%;display:block;object-fit:fill}
 .box img.pg{opacity:0;transition:opacity .7s}
 .box.ended img.pg{opacity:1}
@@ -153,7 +153,7 @@ input,textarea{-webkit-user-select:text;user-select:text}
   <div id="finale">
     <div class="box" id="box">
       <video id="opening" playsinline preload="auto" src="abertura.mp4"></video>
-      <img class="pg" src="pagina-info.jpg" alt="Convite do Samuel: 9 anos, 21 de novembro, às 17:00" draggable="false">
+      <img class="pg" loading="eager" decoding="async" src="pagina-info.jpg" alt="Convite do Samuel: 9 anos, 21 de novembro, às 17:00" draggable="false">
       <!-- Troque os endereços (href) pelos links reais -->
       <a class="hot" id="hot-rsvp"  href="#confirmar" aria-label="Confirmar presença"></a>
       <a class="hot" id="hot-local" href="local.html" aria-label="Local da festa" data-sheet="local.jpg" data-alt="Local da festa: Buffet Alegria Mágica."></a>
@@ -472,6 +472,7 @@ async function startFinale() {
   if (finaleStarted) return; finaleStarted = true;
   stopCamera();   // a câmera e o reconhecimento pesam no celular e fariam a música/vídeo travar
   finale.classList.add('on'); sndBtn.classList.add('show');
+  setTimeout(() => { env.style.display = 'none'; cv.style.display = 'none'; hint.style.display = 'none'; }, 700);
   opening.onended = showInfo; opening.onerror = showInfo;
   try { opening.currentTime = 0; opening.muted = false; await opening.play(); }
   catch (_) { try { opening.muted = true; await opening.play(); } catch (__) { showInfo(); } }
@@ -570,7 +571,7 @@ sndBtn.addEventListener('click', () => {
   sndBtn.classList.toggle('off', bed.muted); sndBtn.setAttribute('aria-pressed', String(bed.muted));
   sndBtn.setAttribute('aria-label', bed.muted ? 'Som desligado' : 'Som ligado');
 });
-opening.addEventListener('timeupdate', () => { if (opening.currentTime >= 9.2) startBed(); });
+opening.addEventListener('timeupdate', () => { if (opening.currentTime >= 8.8) startBed(); });
 opening.addEventListener('ended', startBed);
 
 /* ---------- páginas internas (dicas e local) sem sair do convite, para a música continuar ---------- */
@@ -636,8 +637,10 @@ $('#rsvpForm').addEventListener('submit', async e => {
 function unlockVideo() {
   try { opening.muted = false; const pr = opening.play(); if (pr && pr.then) pr.then(() => { opening.pause(); opening.currentTime = 0; }).catch(() => {}); } catch (_) {}
 }
-function begin(useCam) {
-  audioInit(); loadBed(); started = true; skipBtn.hidden = false; intro.classList.add('gone');
+const pgImg = document.querySelector('img.pg');
+  function preInfo() { try { pgImg.decode && pgImg.decode().catch(() => {}); } catch (_) {} setTimeout(() => { ['local.jpg', 'dicas.jpg'].forEach(u => { const i = new Image(); i.src = u; }); }, 1500); }
+  function begin(useCam) {
+  audioInit(); loadBed(); preInfo(); started = true; skipBtn.hidden = false; intro.classList.add('gone');
   mode = useCam && camOn ? 'cam' : 'touch'; idleHint();
 }
 $('#btnTouch').addEventListener('click', () => { unlockVideo(); mode = 'touch'; begin(false); });
